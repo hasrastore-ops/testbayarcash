@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bayarcash Test</title>
+  <style>
+    body { font-family: sans-serif; max-width: 400px; margin: 50px auto; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; font-size: 16px; }
+    .btn-row { display: flex; gap: 10px; }
+    button { cursor: pointer; border: none; border-radius: 6px; }
+    .qr { background: #4CAF50; color: white; }
+    .fpx { background: #2196F3; color: white; }
+  </style>
+</head>
+<body>
+  <h2>Bayarcash API (Testing)</h2>
+  <form id="paymentForm">
+    <input type="text" id="name" placeholder="Nama Penuh" required>
+    <input type="email" id="email" placeholder="Emel" required>
+    <input type="number" id="amount" placeholder="Amaun (contoh: 10.00)" required step="0.01">
+    <div class="btn-row">
+      <button type="button" class="qr" onclick="submitPayment(5)">Bayar QR</button>
+      <button type="button" class="fpx" onclick="submitPayment(1)">Bayar FPX</button>
+    </div>
+  </form>
+  <p id="status"></p>
+
+  <script>
+    async function submitPayment(channel) {
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+
+      if (!name || !email || !amount) {
+        alert("Sila isi semua maklumat!");
+        return;
+      }
+
+      document.getElementById("status").innerText = "Sedang memproses...";
+
+      try {
+        const res = await fetch('/api/bayarcash', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_channel: channel,
+            amount,
+            payer_name: name,
+            payer_email: email
+          })
+        });
+
+        const data = await res.json();
+
+        if (data?.data?.payment_url) {
+          window.location.href = data.data.payment_url;
+        } else {
+          document.getElementById("status").innerText = "Ralat: " + (data.message || "Tidak dapat buat transaksi.");
+          console.error(data);
+        }
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Ralat sambungan API.";
+      }
+    }
+  </script>
+</body>
+</html>
