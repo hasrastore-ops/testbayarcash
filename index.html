@@ -1,69 +1,45 @@
 <!DOCTYPE html>
-<html lang="ms">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bayarcash Test</title>
-  <style>
-    body { font-family: sans-serif; max-width: 400px; margin: 50px auto; }
-    input, button { width: 100%; padding: 10px; margin: 8px 0; font-size: 16px; }
-    .btn-row { display: flex; gap: 10px; }
-    button { cursor: pointer; border: none; border-radius: 6px; }
-    .qr { background: #4CAF50; color: white; }
-    .fpx { background: #2196F3; color: white; }
-  </style>
-</head>
-<body>
-  <h2>Bayarcash API (Testing)</h2>
-  <form id="paymentForm">
-    <input type="text" id="name" placeholder="Nama Penuh" required>
-    <input type="email" id="email" placeholder="Emel" required>
-    <input type="number" id="amount" placeholder="Amaun (contoh: 10.00)" required step="0.01">
-    <div class="btn-row">
-      <button type="button" class="qr" onclick="submitPayment(5)">Bayar QR</button>
-      <button type="button" class="fpx" onclick="submitPayment(1)">Bayar FPX</button>
-    </div>
-  </form>
-  <p id="status"></p>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bayarcash Test Payment</title>
+  </head>
+  <body>
+    <h2>Bayarcash Sandbox Payment</h2>
+    <form id="paymentForm">
+      <input name="payer_name" placeholder="Nama" required /><br />
+      <input name="payer_email" placeholder="Email" type="email" required /><br />
+      <input name="amount" placeholder="Amaun" type="number" step="0.01" required /><br />
+      <label><input type="radio" name="payment_channel" value="1" checked /> QR</label>
+      <label><input type="radio" name="payment_channel" value="2" /> FPX</label><br /><br />
+      <button type="submit">Bayar Sekarang</button>
+    </form>
 
-  <script>
-    async function submitPayment(channel) {
-      const name = document.getElementById('name').value.trim();
-      const email = document.getElementById('email').value.trim();
-      const amount = document.getElementById('amount').value.trim();
+    <script>
+      document.getElementById("paymentForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = Object.fromEntries(new FormData(e.target).entries());
 
-      if (!name || !email || !amount) {
-        alert("Sila isi semua maklumat!");
-        return;
-      }
+        try {
+          const res = await fetch("/api/bayarcash", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formData),
+          });
 
-      document.getElementById("status").innerText = "Sedang memproses...";
+          const data = await res.json();
+          console.log(data);
 
-      try {
-        const res = await fetch('/api/bayarcash', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            payment_channel: channel,
-            amount,
-            payer_name: name,
-            payer_email: email
-          })
-        });
-
-        const data = await res.json();
-
-        if (data?.data?.payment_url) {
-          window.location.href = data.data.payment_url;
-        } else {
-          document.getElementById("status").innerText = "Ralat: " + (data.message || "Tidak dapat buat transaksi.");
-          console.error(data);
+          if (data.payment_url) {
+            window.location.href = data.payment_url;
+          } else {
+            alert(data.message || "Error creating payment.");
+          }
+        } catch (err) {
+          console.error(err);
+          alert("Something went wrong.");
         }
-      } catch (err) {
-        console.error(err);
-        document.getElementById("status").innerText = "Ralat sambungan API.";
-      }
-    }
-  </script>
-</body>
+      });
+    </script>
+  </body>
 </html>
