@@ -11,9 +11,10 @@
         .form-group { margin-bottom: 15px; text-align: left; }
         label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; }
         input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 18px; cursor: pointer; transition: background-color 0.3s; }
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .payment-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .payment-buttons button { flex: 1; padding: 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        .payment-buttons button:hover { background-color: #0056b3; }
+        .payment-buttons button:disabled { background-color: #ccc; cursor: not-allowed; }
         .message { padding: 20px; border-radius: 4px; margin-top: 20px; font-size: 1.1em; }
         .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -22,6 +23,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- Payment Form -->
         <div id="payment-form-view">
             <h1>Pay with BayarCash</h1>
             <form id="payment-form">
@@ -29,49 +31,104 @@
                 <div class="form-group"><label for="email">Email</label><input type="email" id="email" name="email" required></div>
                 <div class="form-group"><label for="phone">Phone Number (e.g., 60123456789)</label><input type="tel" id="phone" name="phone" required></div>
                 <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" name="amount" step="0.01" min="1.00" required></div>
-                <button type="submit" id="pay-button">Pay Now</button>
+                
+                <!-- Hidden input to store the selected payment channel -->
+                <input type="hidden" name="payment_channel" id="payment_channel" value="">
+
+                <div class="payment-buttons">
+                    <button type="button" id="pay-fpx">Pay with FPX / Online Banking</button>
+                    <button type="button" id="pay-qr">Pay with DuitNow QR</button>
+                </div>
             </form>
         </div>
+
+        <!-- Success Message -->
         <div id="success-message" class="message success hidden">
             <h2>Payment Successful!</h2>
             <p>Thank you for your payment. Your order has been processed.</p>
             <p id="success-order-details"></p>
         </div>
+
+        <!-- Failure Message -->
         <div id="failure-message" class="message error hidden">
             <h2>Payment Failed</h2>
             <p>Unfortunately, your payment could not be processed. Please try again.</p>
         </div>
     </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const formView = document.getElementById('payment-form-view');
             const successMessage = document.getElementById('success-message');
             const failureMessage = document.getElementById('failure-message');
             const successOrderDetails = document.getElementById('success-order-details');
+            const paymentForm = document.getElementById('payment-form');
+            const payFpxButton = document.getElementById('pay-fpx');
+            const payQrButton = document.getElementById('pay-qr');
+            const paymentChannelInput = document.getElementById('payment_channel');
+
+            // Check URL parameters for payment status on page load
             const urlParams = new URLSearchParams(window.location.search);
             const status = urlParams.get('status');
             const order = urlParams.get('order');
+
             if (status === 'success' && order) {
-                formView.classList.add('hidden'); successMessage.classList.remove('hidden');
+                formView.classList.add('hidden');
+                successMessage.classList.remove('hidden');
                 successOrderDetails.textContent = `Order Number: ${order}`;
             } else if (status === 'failed') {
-                formView.classList.add('hidden'); failureMessage.classList.remove('hidden');
+                formView.classList.add('hidden');
+                failureMessage.classList.remove('hidden');
             }
-            const paymentForm = document.getElementById('payment-form');
-            const payButton = document.getElementById('pay-button');
-            paymentForm.addEventListener('submit', async (e) => {
-                e.preventDefault(); payButton.disabled = true; payButton.innerText = 'Processing...';
+
+            const submitPayment = async () => {
+                payFpxButton.disabled = true;
+                payQrButton.disabled = true;
+                payFpxButton.innerText = 'Processing...';
+                payQrButton.innerText = 'Processing...';
+
                 const formData = new FormData(paymentForm);
                 const data = Object.fromEntries(formData);
+
                 try {
-                    const response = await fetch('/api/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), });
+                    const response = await fetch('/api/create-payment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data),
+                    });
+
                     const result = await response.json();
-                    if (result.success) { window.location.href = result.paymentUrl; }
-                    else { alert(`Error: ${result.error}`); payButton.disabled = false; payButton.innerText = 'Pay Now'; }
+
+                    if (result.success) {
+                        window.location.href = result.paymentUrl;
+                    } else {
+                        alert(`Error: ${result.error}`);
+                        // Reset buttons on error
+                        payFpxButton.disabled = false;
+                        payQrButton.disabled = false;
+                        payFpxButton.innerText = 'Pay with FPX / Online Banking';
+                        payQrButton.innerText = 'Pay with DuitNow QR';
+                    }
                 } catch (error) {
-                    console.error('Error:', error); alert('An unexpected error occurred. Please try again.');
-                    payButton.disabled = false; payButton.innerText = 'Pay Now';
+                    console.error('Error:', error);
+                    alert('An unexpected error occurred. Please try again.');
+                    // Reset buttons on error
+                    payFpxButton.disabled = false;
+                    payQrButton.disabled = false;
+                    payFpxButton.innerText = 'Pay with FPX / Online Banking';
+                    payQrButton.innerText = 'Pay with DuitNow QR';
                 }
+            };
+
+            // Handle button clicks
+            payFpxButton.addEventListener('click', () => {
+                paymentChannelInput.value = '1'; // FPX Channel Code
+                submitPayment();
+            });
+
+            payQrButton.addEventListener('click', () => {
+                paymentChannelInput.value = '6'; // DuitNow QR Channel Code
+                submitPayment();
             });
         });
     </script>
