@@ -1,45 +1,79 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>Bayarcash Test Payment</title>
-  </head>
-  <body>
-    <h2>Bayarcash Sandbox Payment</h2>
-    <form id="paymentForm">
-      <input name="payer_name" placeholder="Nama" required /><br />
-      <input name="payer_email" placeholder="Email" type="email" required /><br />
-      <input name="amount" placeholder="Amaun" type="number" step="0.01" required /><br />
-      <label><input type="radio" name="payment_channel" value="1" checked /> QR</label>
-      <label><input type="radio" name="payment_channel" value="2" /> FPX</label><br /><br />
-      <button type="submit">Bayar Sekarang</button>
-    </form>
-
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BayarCash Payment</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { max-width: 500px; width: 100%; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 15px rgba(0,0,0,0.1); text-align: center; }
+        h1 { color: #333; margin-bottom: 25px; }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 18px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .message { padding: 20px; border-radius: 4px; margin-top: 20px; font-size: 1.1em; }
+        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="payment-form-view">
+            <h1>Pay with BayarCash</h1>
+            <form id="payment-form">
+                <div class="form-group"><label for="name">Full Name</label><input type="text" id="name" name="name" required></div>
+                <div class="form-group"><label for="email">Email</label><input type="email" id="email" name="email" required></div>
+                <div class="form-group"><label for="phone">Phone Number (e.g., 60123456789)</label><input type="tel" id="phone" name="phone" required></div>
+                <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" name="amount" step="0.01" min="1.00" required></div>
+                <button type="submit" id="pay-button">Pay Now</button>
+            </form>
+        </div>
+        <div id="success-message" class="message success hidden">
+            <h2>Payment Successful!</h2>
+            <p>Thank you for your payment. Your order has been processed.</p>
+            <p id="success-order-details"></p>
+        </div>
+        <div id="failure-message" class="message error hidden">
+            <h2>Payment Failed</h2>
+            <p>Unfortunately, your payment could not be processed. Please try again.</p>
+        </div>
+    </div>
     <script>
-      document.getElementById("paymentForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const formData = Object.fromEntries(new FormData(e.target).entries());
-
-        try {
-          const res = await fetch("/api/bayarcash", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
-          });
-
-          const data = await res.json();
-          console.log(data);
-
-          if (data.payment_url) {
-            window.location.href = data.payment_url;
-          } else {
-            alert(data.message || "Error creating payment.");
-          }
-        } catch (err) {
-          console.error(err);
-          alert("Something went wrong.");
-        }
-      });
+        document.addEventListener('DOMContentLoaded', () => {
+            const formView = document.getElementById('payment-form-view');
+            const successMessage = document.getElementById('success-message');
+            const failureMessage = document.getElementById('failure-message');
+            const successOrderDetails = document.getElementById('success-order-details');
+            const urlParams = new URLSearchParams(window.location.search);
+            const status = urlParams.get('status');
+            const order = urlParams.get('order');
+            if (status === 'success' && order) {
+                formView.classList.add('hidden'); successMessage.classList.remove('hidden');
+                successOrderDetails.textContent = `Order Number: ${order}`;
+            } else if (status === 'failed') {
+                formView.classList.add('hidden'); failureMessage.classList.remove('hidden');
+            }
+            const paymentForm = document.getElementById('payment-form');
+            const payButton = document.getElementById('pay-button');
+            paymentForm.addEventListener('submit', async (e) => {
+                e.preventDefault(); payButton.disabled = true; payButton.innerText = 'Processing...';
+                const formData = new FormData(paymentForm);
+                const data = Object.fromEntries(formData);
+                try {
+                    const response = await fetch('/api/create-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), });
+                    const result = await response.json();
+                    if (result.success) { window.location.href = result.paymentUrl; }
+                    else { alert(`Error: ${result.error}`); payButton.disabled = false; payButton.innerText = 'Pay Now'; }
+                } catch (error) {
+                    console.error('Error:', error); alert('An unexpected error occurred. Please try again.');
+                    payButton.disabled = false; payButton.innerText = 'Pay Now';
+                }
+            });
+        });
     </script>
-  </body>
+</body>
 </html>
