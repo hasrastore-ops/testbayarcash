@@ -2425,8 +2425,9 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
 //      BAYARCASH INTEGRATION
 // ====================================
 function generateOrderNumber() {
-    const randomNum = Math.floor(10000 + Math.random() * 90000);
-    return `ORD_${randomNum}`;
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return `ORD-${timestamp}${random}`;
 }
 
 function showPaymentRedirectModal(paymentUrl) {
@@ -2453,48 +2454,29 @@ async function redirectToBayarCash(orderData) {
     try {
         showPaymentLoading();
         
-        // Prepare the request payload
-        const payload = {
-            name: orderData.customerName,
-            email: orderData.customerEmail,
-            phone: orderData.customerPhone,
-            amount: orderData.total,
-            paymentChannel: orderData.paymentChannel
-        };
-        
-        console.log('Sending payload to server:', payload);
-        
         // Call our serverless function to create payment intent
-        const response = await fetch('/api/bayarcash', {
+        const response = await fetch('/api/bayarcash', {  // Using the single bayarcash.js endpoint
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                name: orderData.customerName,
+                email: orderData.customerEmail,
+                phone: orderData.customerPhone,
+                amount: orderData.total,
+                payment_channel: orderData.paymentChannel
+            })
         });
         
-        console.log('Response status:', response.status);
-        
-        // Get the response text first to handle non-JSON responses
-        const responseText = await response.text();
-        console.log('Response text:', responseText);
-        
-        // Try to parse the response as JSON
-        let result;
-        try {
-            result = JSON.parse(responseText);
-        } catch (e) {
-            console.error('Failed to parse response as JSON:', e);
-            throw new Error('Invalid server response');
-        }
-        
+        const result = await response.json();
         console.log('Response from our server:', result);
 
         if (result.success) {
             // Store order data with additional metadata
             localStorage.setItem('pendingOrder', JSON.stringify({
                 orderData: orderData,
-                orderNumber: result.orderNumber,
+                orderNumber: result.orderNumber, // Use the order number from the response
                 totalAmount: orderData.total,
                 timestamp: new Date().toISOString()
             }));
@@ -2517,12 +2499,12 @@ async function redirectToBayarCash(orderData) {
     } catch (error) {
         console.error('Error during payment process:', error);
         hidePaymentLoading();
-        showMessage('Ralat: ' + error.message + '. Sila cuba lagi.', 'error');
+        showMessage('Ralat: Tidak dapat menghubungi pembekal pembayaran. Sila cuba lagi.', 'error');
         return false;
     }
 }
-
-// Form submission handler
+        
+        // Form submission handler
 orderForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -2554,8 +2536,6 @@ orderForm.addEventListener('submit', async function(e) {
         package: selectedPackage,
         paymentChannel: paymentChannel
     };
-    
-    console.log('Form submission with order data:', orderData);
     
     // Show loading spinner
     loadingSpinner.style.display = 'block';
