@@ -2465,10 +2465,15 @@ async function redirectToBayarCash(orderData) {
                 email: orderData.customerEmail,
                 phone: orderData.customerPhone,
                 amount: orderData.total,
-                payment_channel: orderData.paymentChannel,
-                orderNumber: orderData.orderNumber // Send the order number to backend
+                paymentChannel: orderData.paymentChannel
             })
         });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Server error response:', errorData);
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
         
         const result = await response.json();
         console.log('Response from our server:', result);
@@ -2477,7 +2482,7 @@ async function redirectToBayarCash(orderData) {
             // Store order data with additional metadata
             localStorage.setItem('pendingOrder', JSON.stringify({
                 orderData: orderData,
-                orderNumber: result.orderNumber, // Use the order number from the response
+                orderNumber: result.orderNumber,
                 totalAmount: orderData.total,
                 timestamp: new Date().toISOString()
             }));
@@ -2500,7 +2505,7 @@ async function redirectToBayarCash(orderData) {
     } catch (error) {
         console.error('Error during payment process:', error);
         hidePaymentLoading();
-        showMessage('Ralat: Tidak dapat menghubungi pembekal pembayaran. Sila cuba lagi.', 'error');
+        showMessage('Ralat: ' + error.message + '. Sila cuba lagi.', 'error');
         return false;
     }
 }
