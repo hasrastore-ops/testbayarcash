@@ -563,106 +563,114 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
         }
 
         // Function to load order details
-        async function loadOrderDetails() {
-            console.log('🔄 Loading order details...');
+async function loadOrderDetails() {
+    console.log('🔄 Loading order details...');
+    try {
+        // Fix URL parameter parsing - handle duplicate ? in URL
+        const fullUrl = window.location.search;
+        console.log('Full URL:', fullUrl);
+        
+        // Split on first ? and then on & to get clean parameters
+        const urlParts = fullUrl.split('?');
+        let paramString = '';
+        
+        if (urlParts.length > 1) {
+            // Take everything after the first ?
+            paramString = urlParts.slice(1).join('?');
+        }
+        
+        const urlParams = new URLSearchParams(paramString);
+        
+        const status = urlParams.get('status');
+        let order = urlParams.get('order');
+        
+        console.log('Raw order parameter:', order);
+        
+        // Fix: Extract just the order number if it has transaction ID attached
+        if (order && order.includes('?transaction_id=')) {
+            order = order.split('?transaction_id=')[0];
+            console.log('Cleaned order number:', order);
+        }
+        
+        console.log('Parsed URL Parameters:', {
+            status: status,
+            order: order
+        });
+        
+        // Check if payment was successful based on URL status
+        if (status !== 'success') {
+            console.error('❌ Payment was not successful based on URL status');
+            showOrderDetailsError();
+            return;
+        }
+        
+        // Try to get data from localStorage
+        let pendingOrder = localStorage.getItem('pendingOrder');
+        
+        if (!pendingOrder) {
+            console.error('❌ No pending order found in localStorage');
+            showOrderDetailsError();
+            return;
+        }
+        
+        const orderData = JSON.parse(pendingOrder);
+        console.log('✅ Parsed order data:', orderData);
+        
+        // Verify that the order number matches
+        if (orderData.orderNumber !== order) {
+            console.error('❌ Order number mismatch');
+            console.log('Expected:', orderData.orderNumber);
+            console.log('Received:', order);
+            
+            // Try to find the order in Google Sheets using the received order number
+            await findOrderByNumber(order);
+            return;
+        }
+        
+        displayOrderDetails(orderData);
+        
+        // Send email immediately based on Google Sheets data
+        await sendEmailForOrder(order);
+        
+        // Check email status
+        checkEmailStatus(order);
+        
+        // Try to send conversion event via Conversions API
+        console.log('🎯 Sending conversion via Conversions API...');
+        const conversionSent = await sendConversionEvent(orderData);
+        
+        if (conversionSent) {
+            console.log('✅ Conversion event sent successfully via Conversions API');
+        } else {
+            console.log('⚠️ Conversions API failed, trying client-side pixel tracking');
+            // Fallback to client-side pixel tracking
             try {
-                // Fix URL parameter parsing - handle duplicate ? in URL
-                const fullUrl = window.location.search;
-                console.log('Full URL:', fullUrl);
-                
-                // Split on first ? and then on & to get clean parameters
-                const urlParts = fullUrl.split('?');
-                let paramString = '';
-                
-                if (urlParts.length > 1) {
-                    // Take everything after the first ?
-                    paramString = urlParts.slice(1).join('?');
-                }
-                
-                const urlParams = new URLSearchParams(paramString);
-                
-                const status = urlParams.get('status');
-                const order = urlParams.get('order');
-                
-                console.log('Parsed URL Parameters:', {
-                    status: status,
-                    order: order
+                fbq('track', 'Purchase', {
+                    content_name: 'PROSTREAM 4 App Power Package',
+                    content_category: 'Streaming',
+                    content_ids: ['prostream_4app_package'],
+                    content_type: 'product',
+                    value: orderData.totalAmount || orderData.orderData.total,
+                    currency: 'MYR'
                 });
-                
-                // Check if payment was successful based on URL status
-                if (status !== 'success') {
-                    console.error('❌ Payment was not successful based on URL status');
-                    showOrderDetailsError();
-                    return;
-                }
-                
-                // Try to get data from localStorage
-                let pendingOrder = localStorage.getItem('pendingOrder');
-                
-                if (!pendingOrder) {
-                    console.error('❌ No pending order found in localStorage');
-                    showOrderDetailsError();
-                    return;
-                }
-                
-                const orderData = JSON.parse(pendingOrder);
-                console.log('✅ Parsed order data:', orderData);
-                
-                // Verify that the order number matches
-                if (orderData.orderNumber !== order) {
-                    console.error('❌ Order number mismatch');
-                    console.log('Expected:', orderData.orderNumber);
-                    console.log('Received:', order);
-                    
-                    // Try to find the order in Google Sheets using the received order number
-                    await findOrderByNumber(order);
-                    return;
-                }
-                
-                displayOrderDetails(orderData);
-                
-                // Send email immediately based on Google Sheets data
-                await sendEmailForOrder(order);
-                
-                // Check email status
-                checkEmailStatus(order);
-                
-                // Try to send conversion event via Conversions API
-                console.log('🎯 Sending conversion via Conversions API...');
-                const conversionSent = await sendConversionEvent(orderData);
-                
-                if (conversionSent) {
-                    console.log('✅ Conversion event sent successfully via Conversions API');
-                } else {
-                    console.log('⚠️ Conversions API failed, trying client-side pixel tracking');
-                    // Fallback to client-side pixel tracking
-                    try {
-                        fbq('track', 'Purchase', {
-                            content_name: 'PROSTREAM 4 App Power Package',
-                            content_category: 'Streaming',
-                            content_ids: ['prostream_4app_package'],
-                            content_type: 'product',
-                            value: orderData.totalAmount || orderData.orderData.total,
-                            currency: 'MYR'
-                        });
-                        console.log('✅ Meta Purchase event fired successfully via client-side pixel');
-                    } catch (error) {
-                        console.error('❌ Client-side pixel tracking also failed:', error);
-                    }
-                }
-                
-                // Send Discord notification for successful payment
-                console.log('📧 Sending Discord notification...');
-                await sendDiscordNotification(orderData.orderData);
-                
-                // Clear the pending order from localStorage
-                localStorage.removeItem('pendingOrder');
-                console.log('✅ Cleared pendingOrder from localStorage.');
+                console.log('✅ Meta Purchase event fired successfully via client-side pixel');
             } catch (error) {
-                console.error('❌ Error in loadOrderDetails:', error);
-                showOrderDetailsError();
+                console.error('❌ Client-side pixel tracking also failed:', error);
             }
         }
+        
+        // Send Discord notification for successful payment
+        console.log('📧 Sending Discord notification...');
+        await sendDiscordNotification(orderData.orderData);
+        
+        // Clear the pending order from localStorage
+        localStorage.removeItem('pendingOrder');
+        console.log('✅ Cleared pendingOrder from localStorage.');
+    } catch (error) {
+        console.error('❌ Error in loadOrderDetails:', error);
+        showOrderDetailsError();
+    }
+}
 
         // Function to find order by number in Google Sheets
         async function findOrderByNumber(orderNumber) {
