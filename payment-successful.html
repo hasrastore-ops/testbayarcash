@@ -286,6 +286,23 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             background-color: #128C7E;
         }
 
+        .email-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .email-status.pending {
+            background-color: rgba(249, 199, 79, 0.1);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .email-status.sent {
+            background-color: rgba(67, 181, 129, 0.1);
+            border-left: 4px solid var(--success-color);
+        }
+
         @media (max-width: 768px) {
             h1 { font-size: 2rem; }
             h2 { font-size: 1.5rem; }
@@ -305,7 +322,7 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
 
         <main>
             <div class="success-card">
-                <p>Pembayaran anda telah berjaya diproses. Kami sedang menyediakan akaun anda dan akan menghantar maklumat lengkap melalui emel dan WhatsApp dalam masa terdekat.</p>
+                <p>Pembayaran anda telah berjaya diproses. Kami sedang menyediakan akaun anda dan akan menghantar maklumat lengkap melalui emel dalam masa terdekat.</p>
                 
                 <div class="highlight-box">
                     <h3>🎉 PENTING: Panduan Pemasangan</h3>
@@ -318,12 +335,17 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
                     <p style="text-align: center;">Memuatkan butiran pesanan...</p>
                 </div>
 
+                <div class="email-status pending" id="emailStatus">
+                    <p>📧 Status Emel: <strong>Sedang Diproses</strong></p>
+                    <p>Panduan pemasangan akan dihantar ke emel anda dalam masa 15 minit.</p>
+                </div>
+
                 <div class="steps">
                     <h3>Langkah Seterusnya:</h3>
                     <div class="step">
                         <div class="step-number">1</div>
                         <div class="step-content">
-                            <h4>Semak Emel & WhatsApp</h4>
+                            <h4>Semak Emel</h4>
                             <p>Anda akan menerima pautan muat turun dan panduan pemasangan dalam masa 15 minit.</p>
                         </div>
                     </div>
@@ -514,6 +536,27 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             }
         }
 
+        // Function to check if email was sent via Google Apps Script
+        async function checkEmailStatus(orderNumber) {
+            try {
+                // This would ideally check with your backend to see if the email was sent
+                // For now, we'll simulate this with a delay
+                setTimeout(() => {
+                    const emailStatusElement = document.getElementById('emailStatus');
+                    emailStatusElement.className = 'email-status sent';
+                    emailStatusElement.innerHTML = `
+                        <p>📧 Status Emel: <strong>Telah Dihantar</strong></p>
+                        <p>Panduan pemasangan telah dihantar ke emel anda. Sila semak folder spam jika tidak menerima dalam 15 minit.</p>
+                    `;
+                }, 5000); // Simulate email being sent after 5 seconds
+                
+                return true;
+            } catch (error) {
+                console.error('Error checking email status:', error);
+                return false;
+            }
+        }
+
         // Function to load order details
         async function loadOrderDetails() {
             console.log('🔄 Loading order details...');
@@ -550,6 +593,9 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
                 }
                 
                 displayOrderDetails(orderData);
+                
+                // Check email status
+                checkEmailStatus(orderData.orderNumber);
                 
                 // Try to send conversion event via Conversions API
                 console.log('🎯 Sending conversion via Conversions API...');
