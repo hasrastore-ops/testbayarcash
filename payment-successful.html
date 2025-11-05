@@ -303,6 +303,23 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             border-left: 4px solid var(--success-color);
         }
 
+        .transaction-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .transaction-status.checking {
+            background-color: rgba(249, 199, 79, 0.1);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .transaction-status.verified {
+            background-color: rgba(67, 181, 129, 0.1);
+            border-left: 4px solid var(--success-color);
+        }
+
         @media (max-width: 768px) {
             h1 { font-size: 2rem; }
             h2 { font-size: 1.5rem; }
@@ -333,6 +350,11 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
                 <div class="order-details" id="orderDetails">
                     <div class="loading-spinner"></div>
                     <p style="text-align: center;">Memuatkan butiran pesanan...</p>
+                </div>
+
+                <div class="transaction-status checking" id="transactionStatus">
+                    <p>🔄 Status Transaksi: <strong>Semak Transaksi</strong></p>
+                    <p>Mengesahkan status pembayaran anda...</p>
                 </div>
 
                 <div class="email-status pending" id="emailStatus">
@@ -473,25 +495,39 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             }, 3000);
         }
 
-        // Function to verify payment status with BayarCash
-        async function verifyPaymentStatus(orderNumber) {
+        // Function to check transaction status
+        async function checkTransactionStatus() {
             try {
-                // Since BayarCash redirects back with status in URL parameters,
-                // we can verify the payment by checking the URL parameters
-                const urlParams = new URLSearchParams(window.location.search);
-                const status = urlParams.get('status');
-                const order = urlParams.get('order');
+                // Get transaction ID from URL if available
+                const urlParams = new URLSearchParams(window.location.search.split('?')[1]);
+                const transactionId = urlParams.get('transaction_id');
                 
-                // Verify that the order number matches
-                if (order !== orderNumber) {
-                    console.error('Order number mismatch');
+                if (!transactionId) {
+                    console.log('No transaction ID found in URL');
                     return false;
                 }
                 
-                // Check if payment was successful
-                return status === 'success';
+                console.log('Checking transaction status for:', transactionId);
+                
+                const response = await fetch('/api/check-transaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ transactionId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.transaction.status === 3) {
+                    console.log('Transaction is successful');
+                    return true;
+                } else {
+                    console.log('Transaction not successful:', result.transaction);
+                    return false;
+                }
             } catch (error) {
-                console.error('Error verifying payment status:', error);
+                console.error('Error checking transaction status:', error);
                 return false;
             }
         }
@@ -558,91 +594,162 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
         }
 
         // Function to load order details
-async function loadOrderDetails() {
-    console.log('🔄 Loading order details...');
-    try {
-        // Get URL parameters - fix for duplicate parameters
-        const urlParams = new URLSearchParams(window.location.search.split('?')[1]);
-        const status = urlParams.get('status');
-        const order = urlParams.get('order');
-        
-        console.log('URL Parameters:', {
-            status: status,
-            order: order,
-            fullUrl: window.location.search
-        });
-        
-        // Check if payment was successful
-        if (status !== 'success') {
-            console.error('❌ Payment was not successful');
-            showOrderDetailsError();
-            return;
-        }
-        
-        // Try to get data from localStorage
-        let pendingOrder = localStorage.getItem('pendingOrder');
-        
-        if (!pendingOrder) {
-            console.error('❌ No pending order found in localStorage');
-            showOrderDetailsError();
-            return;
-        }
-        
-        const orderData = JSON.parse(pendingOrder);
-        console.log('✅ Parsed order data:', orderData);
-        
-        // Verify that the order number matches
-        if (orderData.orderNumber !== order) {
-            console.error('❌ Order number mismatch');
-            console.log('Expected:', orderData.orderNumber);
-            console.log('Received:', order);
-            
-            // Try to find the order in Google Sheets using the received order number
-            await findOrderByNumber(order);
-            return;
-        }
-        
-        displayOrderDetails(orderData);
-        
-        // Check email status
-        checkEmailStatus(orderData.orderNumber);
-        
-        // Try to send conversion event via Conversions API
-        console.log('🎯 Sending conversion via Conversions API...');
-        const conversionSent = await sendConversionEvent(orderData);
-        
-        if (conversionSent) {
-            console.log('✅ Conversion event sent successfully via Conversions API');
-        } else {
-            console.log('⚠️ Conversions API failed, trying client-side pixel tracking');
-            // Fallback to client-side pixel tracking
+        async function loadOrderDetails() {
+            console.log('🔄 Loading order details...');
             try {
-                fbq('track', 'Purchase', {
-                    content_name: 'PROSTREAM 4 App Power Package',
-                    content_category: 'Streaming',
-                    content_ids: ['prostream_4app_package'],
-                    content_type: 'product',
-                    value: orderData.totalAmount || orderData.orderData.total,
-                    currency: 'MYR'
+                // Get URL parameters
+                const urlParams = new URLSearchParams(window.location.search.split('?')[1]);
+                const status = urlParams.get('status');
+                const order = urlParams.get('order');
+                
+                console.log('URL Parameters:', {
+                    status: status,
+                    order: order,
+                    fullUrl: window.location.search
                 });
-                console.log('✅ Meta Purchase event fired successfully via client-side pixel');
+                
+                // Check if payment was successful
+                if (status !== 'success') {
+                    console.error('❌ Payment was not successful');
+                    showOrderDetailsError();
+                    return;
+                }
+                
+                // Check actual transaction status
+                const isTransactionSuccessful = await checkTransactionStatus();
+                
+                if (!isTransactionSuccessful) {
+                    console.error('❌ Transaction not successful');
+                    showOrderDetailsError();
+                    return;
+                }
+                
+                // Update transaction status
+                const transactionStatusElement = document.getElementById('transactionStatus');
+                transactionStatusElement.className = 'transaction-status verified';
+                transactionStatusElement.innerHTML = `
+                    <p>✅ Status Transaksi: <strong>Telah Disahkan</strong></p>
+                    <p>Pembayaran anda telah berjaya diproses.</p>
+                `;
+                
+                // Try to get data from localStorage
+                let pendingOrder = localStorage.getItem('pendingOrder');
+                
+                if (!pendingOrder) {
+                    console.error('❌ No pending order found in localStorage');
+                    showOrderDetailsError();
+                    return;
+                }
+                
+                const orderData = JSON.parse(pendingOrder);
+                console.log('✅ Parsed order data:', orderData);
+                
+                // Verify that the order number matches
+                if (orderData.orderNumber !== order) {
+                    console.error('❌ Order number mismatch');
+                    console.log('Expected:', orderData.orderNumber);
+                    console.log('Received:', order);
+                    
+                    // Try to find the order in Google Sheets using the received order number
+                    await findOrderByNumber(order);
+                    return;
+                }
+                
+                displayOrderDetails(orderData);
+                
+                // Check email status
+                checkEmailStatus(orderData.orderNumber);
+                
+                // Try to send conversion event via Conversions API
+                console.log('🎯 Sending conversion via Conversions API...');
+                const conversionSent = await sendConversionEvent(orderData);
+                
+                if (conversionSent) {
+                    console.log('✅ Conversion event sent successfully via Conversions API');
+                } else {
+                    console.log('⚠️ Conversions API failed, trying client-side pixel tracking');
+                    // Fallback to client-side pixel tracking
+                    try {
+                        fbq('track', 'Purchase', {
+                            content_name: 'PROSTREAM 4 App Power Package',
+                            content_category: 'Streaming',
+                            content_ids: ['prostream_4app_package'],
+                            content_type: 'product',
+                            value: orderData.totalAmount || orderData.orderData.total,
+                            currency: 'MYR'
+                        });
+                        console.log('✅ Meta Purchase event fired successfully via client-side pixel');
+                    } catch (error) {
+                        console.error('❌ Client-side pixel tracking also failed:', error);
+                    }
+                }
+                
+                // Send Discord notification for successful payment
+                console.log('📧 Sending Discord notification...');
+                await sendDiscordNotification(orderData.orderData);
+                
+                // Clear the pending order from localStorage
+                localStorage.removeItem('pendingOrder');
+                console.log('✅ Cleared pendingOrder from localStorage.');
             } catch (error) {
-                console.error('❌ Client-side pixel tracking also failed:', error);
+                console.error('❌ Error in loadOrderDetails:', error);
+                showOrderDetailsError();
             }
         }
-        
-        // Send Discord notification for successful payment
-        console.log('📧 Sending Discord notification...');
-        await sendDiscordNotification(orderData.orderData);
-        
-        // Clear the pending order from localStorage
-        localStorage.removeItem('pendingOrder');
-        console.log('✅ Cleared pendingOrder from localStorage.');
-    } catch (error) {
-        console.error('❌ Error in loadOrderDetails:', error);
-        showOrderDetailsError();
-    }
-}
+
+        // Function to find order by number in Google Sheets
+        async function findOrderByNumber(orderNumber) {
+            try {
+                const response = await fetch('/api/find-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        orderNumber: orderNumber
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Found order in Google Sheets:', result.orderData);
+                    displayOrderDetails(result.orderData);
+                    
+                    // Check email status
+                    checkEmailStatus(result.orderData.orderNumber);
+                    
+                    // Send Discord notification
+                    await sendDiscordNotification(result.orderData);
+                    
+                    // Try to send conversion event
+                    const conversionSent = await sendConversionEvent(result.orderData);
+                    
+                    if (!conversionSent) {
+                        // Fallback to client-side pixel tracking
+                        try {
+                            fbq('track', 'Purchase', {
+                                content_name: 'PROSTREAM 4 App Power Package',
+                                content_category: 'Streaming',
+                                content_ids: ['prostream_4app_package'],
+                                content_type: 'product',
+                                value: result.orderData.totalAmount || result.orderData.orderData.total,
+                                currency: 'MYR'
+                            });
+                            console.log('✅ Meta Purchase event fired successfully via client-side pixel');
+                        } catch (error) {
+                            console.error('❌ Client-side pixel tracking also failed:', error);
+                        }
+                    }
+                } else {
+                    console.error('❌ Order not found in Google Sheets');
+                    showOrderDetailsError();
+                }
+            } catch (error) {
+                console.error('❌ Error finding order:', error);
+                showOrderDetailsError();
+            }
+        }
 
         // Function to display order details
         function displayOrderDetails(orderData) {
