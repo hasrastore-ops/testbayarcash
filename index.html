@@ -2423,12 +2423,7 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
         
 // ====================================
 //      BAYARCASH INTEGRATION
-// ====================================
-function generateOrderNumber() {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    return `ORD-${timestamp}${random}`;
-}
+// ===================================
 
 function showPaymentRedirectModal(paymentUrl) {
     const modal = document.getElementById('paymentRedirectModal');
@@ -2528,7 +2523,8 @@ orderForm.addEventListener('submit', async function(e) {
     }
     
     // Generate order number
-    const orderNumber = generateOrderNumber();
+    // Generate order number
+        const orderNumber = `ORD-${Date.now()}`;
     
     // Create order data object
     const orderData = {
