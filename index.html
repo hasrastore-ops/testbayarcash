@@ -2424,19 +2424,11 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
 // ====================================
 //      BAYARCASH INTEGRATION
 // ===================================
-let counter = 0; // Initialize your sequence counter
-const prefix = 'ORD_';
-const desiredLength = 5; // The desired length of the number part (e.g., 00000)
-
-function getNextOrderNumber() {
-  // Convert the current counter to a string, then pad the start with zeros
-  const paddedCounter = String(counter).padStart(desiredLength, '0');
-  const orderNumber = prefix + paddedCounter;
-
-  // Increment the counter for the next time it's called
-  counter++;
-
-  return orderNumberx;
+function generateOrderNumber() {
+    const randomNum = Math.floor(10000 + Math.random() * 90000);
+    return `ORD_${randomNum}`;
+    
+    const orderNumber = generateOrderNumber()
     
 function showPaymentRedirectModal(paymentUrl) {
     const modal = document.getElementById('paymentRedirectModal');
