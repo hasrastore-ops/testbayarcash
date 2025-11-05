@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const API_SECRET_KEY = 'CBFSkTgiaIcro1lZLyaiD8zyFNaa2Fsa';
+const API_SECRET_KEY = 'yQlVIsj93a3KpL5ovDaQw2TYoUZj4qli';
 
 // Google Apps Script URL (using your provided URL)
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzyy6dwCOBf7etABb36fiIIU56jpPWomc5YQCMfZ9iyCzV7gy5AuCG06ayfm_3odcsr/exec';
