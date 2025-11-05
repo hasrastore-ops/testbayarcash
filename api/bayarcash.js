@@ -6,6 +6,9 @@ const PORTAL_KEY = '779cd699e9e59a84c4581a68fd7e0130';
 const PERSONAL_ACCESS_TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI1IiwianRpIjoiZDM4MjI5ZTQ5NTllYzQ4Mjg5NDU1Yzg1ZmYyMzMwMTQxNTVlYzI4ZjA0MDIyZjc4YzVhOWFkNWZlZDIxZDBjNzYwYmIwYWI2MGY5YjM5ZDMiLCJpYXQiOjE3MjQxNDAwNDEuMDgwNTM1LCJuYmYiOjE3MjQxNDAwNDEuMDgwNTM3LCJleHAiOjIwMzk2NzI4NDEuMDc5OTAxLCJzdWIiOiI2Iiwic2NvcGVzIjpbIioiXX0.Kn6MXwi6d33aZQpnQqq_Ng7b6UeNlZiXIJ-Jth6PmUoRJBTmw4hdAlDQVSJRosHN4giUBm1lquflNnjqpwI9-bBv-ttqF79X3GjW2GMkYzAnvghGyEn5ldQwBQdmp8pjm7o4Pn1faMe81I5rehQLM8rJFnnQsArKzHl6ZHi7w4gMscIsP-ISWnTN7zO0nBNw6KA5ZpGhhPPhM8Zfrq4nmDWtne6-8h1VoFErPTaKu_GfDXma3PnfJaGwGtWJdJePB6wpR_FwrsB8zgByyOilgRTNZiTBHio4-c-T0V1UU48SDojmCEYNuD1iSdQC-MRaAKUaHdWy7kfmyOy7FohmBbqsag8F47UjDD97VoVOmfUYP6FeKGTMOBuqcOcgN42KXs0Pa6juWIHXtOqn6_WFU9oAhuELIRDX8qR_0-CEIQSJxeeKj8AWBcAvgM2iUeD15QTHJAC41EKpLpL31HboNvk4bJfol4vo3j1SBdHMLmZzI3iENBJtGEO-jNgovhzDkPkCu39u0PrA6-La7VqZ3a-6ItvRyVHcR4ud_zl2oHBl-ZggPB92XVV7yNGUOgHpbshptWbcSWR6XeHHkbNU2K9T8y9c62r-R9KzK07fvn0C3bgR7f8wwgBrZn7WR_dC6Rk_pjumCi8UvItFOgDa5TQXgUnZVBFMPZY3h8APQA0';
 const API_SECRET_KEY = 'CBFSkTgiaIcro1lZLyaiD8zyFNaa2Fsa';
 
+// Google Apps Script URL (using your provided URL)
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzyy6dwCOBf7etABb36fiIIU56jpPWomc5YQCMfZ9iyCzV7gy5AuCG06ayfm_3odcsr/exec';
+
 function generateChecksum(payload, secretKey) {
     const trimmedPayload = Object.fromEntries(
         Object.entries(payload).map(([key, value]) => [key, String(value).trim()])
@@ -13,6 +16,29 @@ function generateChecksum(payload, secretKey) {
     const sortedKeys = Object.keys(trimmedPayload).sort();
     const stringToSign = sortedKeys.map(key => trimmedPayload[key]).join('|');
     return crypto.createHmac('sha256', secretKey).update(stringToSign).digest('hex');
+}
+
+// Function to save order to Google Sheets
+async function saveOrderToGoogleSheets(orderData) {
+    try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                action: 'saveOrder',
+                orderData: orderData
+            })
+        });
+        
+        const result = await response.json();
+        console.log('Order save result:', result);
+        return result.success;
+    } catch (error) {
+        console.error('Error saving order to Google Sheets:', error);
+        return false;
+    }
 }
 
 module.exports = async (req, res) => {
@@ -23,14 +49,14 @@ module.exports = async (req, res) => {
     try {
         const { name, email, phone, amount, payment_channel } = req.body;
         const orderNumber = `ORD-${Date.now()}`;
-        const returnUrl = `${req.headers.origin}/?status=success&order=${orderNumber}`;
+        const returnUrl = `${req.headers.origin}/payment-successful.html?status=success&order=${orderNumber}`;
         const callbackUrl = `${req.headers.origin}/api/webhook`;
 
         const fullPayload = {
             payment_channel: payment_channel,
             portal_key: PORTAL_KEY,
             order_number: orderNumber,
-            amount: amount, // Send amount directly in MYR
+            amount: amount,
             payer_name: name,
             payer_email: email,
             payer_telephone_number: phone,
@@ -39,9 +65,9 @@ module.exports = async (req, res) => {
         };
 
         const checksumPayload = {
-            payment_channel: payment_channel, // Include payment_channel in checksum
+            payment_channel: payment_channel,
             order_number: orderNumber,
-            amount: amount.toString(), // Send amount as string
+            amount: amount.toString(),
             payer_name: name,
             payer_email: email,
         };
@@ -61,10 +87,24 @@ module.exports = async (req, res) => {
         const data = await apiResponse.json();
 
         if (data.url) {
+            // Save order to Google Sheets
+            const orderData = {
+                orderNumber: orderNumber,
+                customerName: name,
+                customerEmail: email,
+                customerPhone: phone,
+                product: 'PROSTREAM 4 App Power Package',
+                amount: amount,
+                orderDate: new Date().toISOString()
+            };
+            
+            // Save order (don't wait for it to complete)
+            saveOrderToGoogleSheets(orderData);
+            
             res.status(200).json({ 
                 success: true, 
                 paymentUrl: data.url,
-                orderNumber: orderNumber // Return order number for tracking
+                orderNumber: orderNumber
             });
         } else {
             console.error('Bayarcash API Error:', data);
