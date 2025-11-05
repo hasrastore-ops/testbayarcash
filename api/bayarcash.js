@@ -47,15 +47,20 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { name, email, phone, amount, payment_channel } = req.body;
-        const orderNumber = `ORD-${Date.now()}`;
+        const { name, email, phone, amount, payment_channel, orderNumber } = req.body;
+        
+        // Use the order number from the frontend instead of generating a new one
+        if (!orderNumber) {
+            return res.status(400).json({ success: false, error: 'Order number is required' });
+        }
+        
         const returnUrl = `${req.headers.origin}/payment-successful.html?status=success&order=${orderNumber}`;
         const callbackUrl = `${req.headers.origin}/api/webhook`;
 
         const fullPayload = {
             payment_channel: payment_channel,
             portal_key: PORTAL_KEY,
-            order_number: orderNumber,
+            order_number: orderNumber, // Use the frontend order number
             amount: amount,
             payer_name: name,
             payer_email: email,
@@ -66,7 +71,7 @@ module.exports = async (req, res) => {
 
         const checksumPayload = {
             payment_channel: payment_channel,
-            order_number: orderNumber,
+            order_number: orderNumber, // Use the frontend order number
             amount: amount.toString(),
             payer_name: name,
             payer_email: email,
@@ -89,7 +94,7 @@ module.exports = async (req, res) => {
         if (data.url) {
             // Save order to Google Sheets
             const orderData = {
-                orderNumber: orderNumber,
+                orderNumber: orderNumber, // Use the frontend order number
                 customerName: name,
                 customerEmail: email,
                 customerPhone: phone,
@@ -104,7 +109,7 @@ module.exports = async (req, res) => {
             res.status(200).json({ 
                 success: true, 
                 paymentUrl: data.url,
-                orderNumber: orderNumber
+                orderNumber: orderNumber // Return the same order number
             });
         } else {
             console.error('Bayarcash API Error:', data);
