@@ -2455,7 +2455,7 @@ async function redirectToBayarCash(orderData) {
         showPaymentLoading();
         
         // Call our serverless function to create payment intent
-        const response = await fetch('/api/bayarcash', {  // Using the single bayarcash.js endpoint
+        const response = await fetch('/api/bayarcash', {  // Changed from /api/create-payment
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2465,7 +2465,8 @@ async function redirectToBayarCash(orderData) {
                 email: orderData.customerEmail,
                 phone: orderData.customerPhone,
                 amount: orderData.total,
-                payment_channel: orderData.paymentChannel
+                payment_channel: orderData.paymentChannel,
+                orderNumber: orderData.orderNumber // Include the order number
             })
         });
         
@@ -2521,12 +2522,12 @@ orderForm.addEventListener('submit', async function(e) {
         return;
     }
     
-    // Generate order number
-    const orderNumber = generateOrderNumber();
+    // Generate order number only once
+    const orderNumber = `ORD-${Date.now()}`;
     
     // Create order data object
     const orderData = {
-        orderNumber: orderNumber,
+        orderNumber: orderNumber, // Generate once and use throughout
         customerName: name,
         customerPhone: phone,
         customerEmail: email,
