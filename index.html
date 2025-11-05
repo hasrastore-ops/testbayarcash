@@ -2495,6 +2495,12 @@ async function redirectToBayarCash(orderData) {
             hidePaymentLoading();
             const errorMessage = result.error || 'Ralat: Tidak dapat menjana pembayaran. Sila cuba lagi.';
             showMessage(errorMessage, 'error');
+            
+            // If the error is related to saving the order, show a more specific message
+            if (result.details && result.details.includes('Failed to save order')) {
+                showMessage('Masalah teknikal berlaku semasa menyimpan pesanan anda. Sila cuba lagi atau hubungi sokongan pelanggan.', 'error');
+            }
+            
             return false;
         }
     } catch (error) {
