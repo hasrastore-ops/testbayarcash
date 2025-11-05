@@ -16,13 +16,47 @@ function generateChecksum(payload, secretKey) {
 }
 
 module.exports = async (req, res) => {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
     try {
+        // Log the incoming request for debugging
+        console.log('Incoming request:', req.method, req.url);
+        console.log('Request headers:', req.headers);
+        console.log('Request body:', req.body);
+
+        // Validate required fields
         const { name, email, phone, amount, paymentChannel } = req.body;
         
+        if (!name || !email || !phone || !amount || !paymentChannel) {
+            console.error('Missing required fields:', { name, email, phone, amount, paymentChannel });
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields. Please provide name, email, phone, amount, and paymentChannel.' 
+            });
+        }
+
+        // Validate amount is a number
+        const parsedAmount = parseFloat(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            console.error('Invalid amount:', amount);
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Invalid amount. Please provide a positive number.' 
+            });
+        }
+
         // Generate order number
         const orderNumber = `ORD-${Date.now()}`;
         
@@ -35,7 +69,7 @@ module.exports = async (req, res) => {
             payment_channel: paymentChannel,
             portal_key: PORTAL_KEY,
             order_number: orderNumber,
-            amount: amount,
+            amount: parsedAmount,
             payer_name: name,
             payer_email: email,
             payer_telephone_number: phone,
@@ -47,7 +81,7 @@ module.exports = async (req, res) => {
         const checksumPayload = {
             payment_channel: paymentChannel,
             order_number: orderNumber,
-            amount: amount.toString(),
+            amount: parsedAmount.toString(),
             payer_name: name,
             payer_email: email,
         };
@@ -55,6 +89,8 @@ module.exports = async (req, res) => {
         // Generate checksum
         const checksum = generateChecksum(checksumPayload, API_SECRET_KEY);
         fullPayload.checksum = checksum;
+
+        console.log('Sending to BayarCash:', fullPayload);
 
         // Make API request to BayarCash
         const apiResponse = await fetch(`${SANDBOX_URL}/payment-intents`, {
@@ -67,6 +103,7 @@ module.exports = async (req, res) => {
         });
 
         const data = await apiResponse.json();
+        console.log('BayarCash response:', data);
 
         if (data.url) {
             // Return success response with payment URL and order number
