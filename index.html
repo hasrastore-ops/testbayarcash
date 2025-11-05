@@ -2455,7 +2455,7 @@ async function redirectToBayarCash(orderData) {
         showPaymentLoading();
         
         // Call our serverless function to create payment intent
-        const response = await fetch('/api/bayarcash', {  // Changed from /api/create-payment
+        const response = await fetch('/api/bayarcash', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2465,7 +2465,8 @@ async function redirectToBayarCash(orderData) {
                 email: orderData.customerEmail,
                 phone: orderData.customerPhone,
                 amount: orderData.total,
-                payment_channel: orderData.paymentChannel
+                payment_channel: orderData.paymentChannel,
+                orderNumber: orderData.orderNumber // Send the order number to backend
             })
         });
         
