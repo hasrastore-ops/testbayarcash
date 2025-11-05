@@ -2423,13 +2423,12 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
         
 // ====================================
 //      BAYARCASH INTEGRATION
-// ===================================
+// ====================================
 function generateOrderNumber() {
     const randomNum = Math.floor(10000 + Math.random() * 90000);
     return `ORD_${randomNum}`;
-    
-    const orderNumber = generateOrderNumber()
-    
+}
+
 function showPaymentRedirectModal(paymentUrl) {
     const modal = document.getElementById('paymentRedirectModal');
     modal.style.display = 'block';
@@ -2509,8 +2508,8 @@ async function redirectToBayarCash(orderData) {
         return false;
     }
 }
-        
-        // Form submission handler
+
+// Form submission handler
 orderForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -2528,8 +2527,7 @@ orderForm.addEventListener('submit', async function(e) {
     }
     
     // Generate order number
-    // Generate order number
-        const orderNumber = orderNumberx ;
+    const orderNumber = generateOrderNumber();
     
     // Create order data object
     const orderData = {
