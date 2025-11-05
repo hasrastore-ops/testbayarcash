@@ -303,23 +303,6 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             border-left: 4px solid var(--success-color);
         }
 
-        .transaction-status {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-        }
-
-        .transaction-status.checking {
-            background-color: rgba(249, 199, 79, 0.1);
-            border-left: 4px solid var(--primary-color);
-        }
-
-        .transaction-status.verified {
-            background-color: rgba(67, 181, 129, 0.1);
-            border-left: 4px solid var(--success-color);
-        }
-
         @media (max-width: 768px) {
             h1 { font-size: 2rem; }
             h2 { font-size: 1.5rem; }
@@ -350,11 +333,6 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
                 <div class="order-details" id="orderDetails">
                     <div class="loading-spinner"></div>
                     <p style="text-align: center;">Memuatkan butiran pesanan...</p>
-                </div>
-
-                <div class="transaction-status checking" id="transactionStatus">
-                    <p>🔄 Status Transaksi: <strong>Semak Transaksi</strong></p>
-                    <p>Mengesahkan status pembayaran anda...</p>
                 </div>
 
                 <div class="email-status pending" id="emailStatus">
@@ -495,43 +473,6 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             }, 3000);
         }
 
-        // Function to check transaction status
-        async function checkTransactionStatus() {
-            try {
-                // Get transaction ID from URL if available
-                const urlParams = new URLSearchParams(window.location.search.split('?')[1]);
-                const transactionId = urlParams.get('transaction_id');
-                
-                if (!transactionId) {
-                    console.log('No transaction ID found in URL');
-                    return false;
-                }
-                
-                console.log('Checking transaction status for:', transactionId);
-                
-                const response = await fetch('/api/check-transaction', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ transactionId })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success && result.transaction.status === 3) {
-                    console.log('Transaction is successful');
-                    return true;
-                } else {
-                    console.log('Transaction not successful:', result.transaction);
-                    return false;
-                }
-            } catch (error) {
-                console.error('Error checking transaction status:', error);
-                return false;
-            }
-        }
-
         // Function to send conversion event via Conversions API
         async function sendConversionEvent(orderData) {
             try {
@@ -593,44 +534,67 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
             }
         }
 
+        // Function to send email for an order
+        async function sendEmailForOrder(orderNumber) {
+            try {
+                console.log('Sending email for order:', orderNumber);
+                
+                const response = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ orderNumber })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ Email sent successfully');
+                    return true;
+                } else {
+                    console.error('❌ Failed to send email:', result.error);
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Error sending email:', error);
+                return false;
+            }
+        }
+
         // Function to load order details
         async function loadOrderDetails() {
             console.log('🔄 Loading order details...');
             try {
-                // Get URL parameters
-                const urlParams = new URLSearchParams(window.location.search.split('?')[1]);
+                // Fix URL parameter parsing - handle duplicate ? in URL
+                const fullUrl = window.location.search;
+                console.log('Full URL:', fullUrl);
+                
+                // Split on first ? and then on & to get clean parameters
+                const urlParts = fullUrl.split('?');
+                let paramString = '';
+                
+                if (urlParts.length > 1) {
+                    // Take everything after the first ?
+                    paramString = urlParts.slice(1).join('?');
+                }
+                
+                const urlParams = new URLSearchParams(paramString);
+                
                 const status = urlParams.get('status');
                 const order = urlParams.get('order');
                 
-                console.log('URL Parameters:', {
+                console.log('Parsed URL Parameters:', {
                     status: status,
-                    order: order,
-                    fullUrl: window.location.search
+                    order: order
                 });
                 
-                // Check if payment was successful
+                // Check if payment was successful based on URL status
                 if (status !== 'success') {
-                    console.error('❌ Payment was not successful');
+                    console.error('❌ Payment was not successful based on URL status');
                     showOrderDetailsError();
                     return;
                 }
-                
-                // Check actual transaction status
-                const isTransactionSuccessful = await checkTransactionStatus();
-                
-                if (!isTransactionSuccessful) {
-                    console.error('❌ Transaction not successful');
-                    showOrderDetailsError();
-                    return;
-                }
-                
-                // Update transaction status
-                const transactionStatusElement = document.getElementById('transactionStatus');
-                transactionStatusElement.className = 'transaction-status verified';
-                transactionStatusElement.innerHTML = `
-                    <p>✅ Status Transaksi: <strong>Telah Disahkan</strong></p>
-                    <p>Pembayaran anda telah berjaya diproses.</p>
-                `;
                 
                 // Try to get data from localStorage
                 let pendingOrder = localStorage.getItem('pendingOrder');
@@ -657,8 +621,11 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
                 
                 displayOrderDetails(orderData);
                 
+                // Send email immediately based on Google Sheets data
+                await sendEmailForOrder(order);
+                
                 // Check email status
-                checkEmailStatus(orderData.orderNumber);
+                checkEmailStatus(order);
                 
                 // Try to send conversion event via Conversions API
                 console.log('🎯 Sending conversion via Conversions API...');
@@ -717,7 +684,7 @@ src="https://www.facebook.com/tr?id=2276519576162204&ev=PageView&noscript=1"
                     displayOrderDetails(result.orderData);
                     
                     // Check email status
-                    checkEmailStatus(result.orderData.orderNumber);
+                    checkEmailStatus(orderNumber);
                     
                     // Send Discord notification
                     await sendDiscordNotification(result.orderData);
